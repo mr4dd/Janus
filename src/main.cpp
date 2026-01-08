@@ -3,12 +3,16 @@
 #include <vector>
 #include <filesystem>
 #include <chrono>
+
 #include "Indexer.h"
 #include "File.h"
+#include "DVScore.h"
+#include "EntropyAnalyser.h"
 
 extern "C" {
     #include "sqlite3.h"
 }
+
 using namespace std;
 namespace fs = filesystem;
 
