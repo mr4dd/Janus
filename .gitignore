@@ -7,3 +7,6 @@ sample.md
 *.db
 *.db-journal
 external/shell.c
+
+*.o
+test_runner

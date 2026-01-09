@@ -40,7 +40,7 @@ double EntropyAnalyzer::process(const std::string& input) {
     double totalEntropy = 0.0;
 
     for (auto token : tokens) {
-        totalEntropy = calculate_shannon_entropy(token);
+        totalEntropy -= calculate_shannon_entropy(token);
     }
     return totalEntropy;
 }

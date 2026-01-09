@@ -38,9 +38,9 @@ class DVScore {
         File file;
         double utility;
         double sensitivity;
-        const double nameWeight = 0.5;
+        const double nameWeight = 0.3;
         const double metadataWeight = 0.4;
-        const double contextWeight = 0.1;
+        const double contextWeight = 0.3;
         double calculateNameScore();
         double calculateMetaScore();
         double calculateContextScore();
