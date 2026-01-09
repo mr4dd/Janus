@@ -7,7 +7,7 @@
 #include "Indexer.h"
 #include "File.h"
 #include "DVScore.h"
-#include "EntropyAnalyser.h"
+#include "EntropyAnalyzer.h"
 
 extern "C" {
     #include "sqlite3.h"

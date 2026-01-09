@@ -45,11 +45,12 @@ class DVScore {
         double calculateMetaScore();
         double calculateContextScore();
         int check_suffix(const std::string&);
+        int countMarkers(const std::string&);
     public:
         DVScore(File);
         void caluclateUtility();
         double getUtility();
-        void CalculateSensitivity();
+        void calculateSensitivity(const std::string&);
         double getSensitivity();
 
 
