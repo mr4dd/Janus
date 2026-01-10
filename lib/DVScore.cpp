@@ -23,7 +23,7 @@ double DVScore::calculateNameScore() {
 double DVScore::calculateMetaScore() {
     const double timeNow = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
     const double timeScore = std::exp(-decayConstant*normaliseTime(timeNow - file.fEpoch));
-    const double sizeScore = 1 - 1/(1+std::exp(-0.1*(file.fSize/1024 - 150)));
+    const double sizeScore = 1 - 1/(1+std::exp(-1.2*(file.fSize/1024 - 150))); //150 is the cutoff point of the sigmoid function, if a file is 150KB the result will be exactly 0.5
     const double extensionScore = extMap.count(file.fExtension) ? extMap.at(file.fExtension) : 0.0;
     return (timeScore * (sizeScore + extensionScore))/3;
 }
@@ -47,10 +47,10 @@ double DVScore::getUtility() {
 }
 
 void DVScore::calculateSensitivity(const std::string& fileContent) {
-    const double extensionScore = extMap.count(file.fExtension) ? extMap.at(file.fExtension) : 0.0;
-    const double sensitivityValue = (std::log(countMarkers(fileContent) + 1) /
-                                (file.fSize/1024)) * extensionScore;
-    sensitivity = std::clamp(sensitivityValue, 0.0, 1.0);
+    const double extensionScore = extMap.count(file.fExtension) ? extMap.at(file.fExtension) : 1;
+    const double sensitivityValue = (std::log((countMarkers(fileContent) + 1) /
+                                    std::log(file.fSize/1024 + 2.0))) * extensionScore;
+    sensitivity = 1.0 / (1.0 + std::exp(-10.0 * (sensitivityValue - 0.1)));;
 }
 
 double DVScore::getSensitivity() {
@@ -58,7 +58,8 @@ double DVScore::getSensitivity() {
 }
 
 double DVScore::normaliseTime(const double time) {
-    return time/86400; // dividing time by the amount of seconds in a day to prevent an underflow when used with exponent
+    return time/86400; // dividing time by the amount of seconds in a day to prevent an underflow
+                       //  when used with exponent
 }
 
 int DVScore::check_suffix(const std::string& input) {
