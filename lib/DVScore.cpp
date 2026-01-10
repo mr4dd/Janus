@@ -7,23 +7,25 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
+#include <chrono>
 
 DVScore::DVScore(File f): file(f), utility(0), sensitivity(0) {}
 
 double DVScore::calculateNameScore() {
     const int rawBoost = check_suffix(file.fName);
     const double KeywordBoost = (file.fPath.find("/tmp") != std::string::npos || file.fPath.find("cache") != std::string::npos) 
-                                ? 0.0
+                                ? -1.0
                                 : rawBoost;
     const double Entropy = EntropyAnalyzer::process(file.fName);
     return (KeywordBoost+(1-Entropy/5))/2;
 }
 
 double DVScore::calculateMetaScore() {
-    const double timeScore = std::exp(-decayConstant*file.fEpoch);
+    const double timeNow = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+    const double timeScore = std::exp(-decayConstant*normaliseTime(timeNow - file.fEpoch));
     const double sizeScore = 1 - 1/(1+std::exp(-0.1*(file.fSize/1024 - 150)));
     const double extensionScore = extMap.count(file.fExtension) ? extMap.at(file.fExtension) : 0.0;
-    return (timeScore + sizeScore + extensionScore)/3;
+    return (timeScore * (sizeScore + extensionScore))/3;
 }
 
 double DVScore::calculateContextScore() {
@@ -53,6 +55,10 @@ void DVScore::calculateSensitivity(const std::string& fileContent) {
 
 double DVScore::getSensitivity() {
     return sensitivity;
+}
+
+double DVScore::normaliseTime(const double time) {
+    return time/86400; // dividing time by the amount of seconds in a day to prevent an underflow when used with exponent
 }
 
 int DVScore::check_suffix(const std::string& input) {

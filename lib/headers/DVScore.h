@@ -34,7 +34,7 @@ class DVScore {
             {"dat",   0.08}, {"sys",   0.02}, {"obj",   0.05}, {"class", 0.05},
             {"o",     0.05}, {"pyc",   0.02}, {"tmp",   0.01}, {"com",   0.05}
         };
-        const double decayConstant = 0.005;
+        const double decayConstant = 0.0001;
         File file;
         double utility;
         double sensitivity;
@@ -46,6 +46,7 @@ class DVScore {
         double calculateContextScore();
         int check_suffix(const std::string&);
         int countMarkers(const std::string&);
+        double normaliseTime(const double);
     public:
         DVScore(File);
         void caluclateUtility();
