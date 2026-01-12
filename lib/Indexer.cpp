@@ -30,40 +30,84 @@ int Indexer::insertFilesBatch() {
         return SQLITE_ERROR;
     }
 
-    const char* sql =
-        "INSERT OR IGNORE INTO files "
-        "(Name, Extension, Path, Size, Epoch, Depth) "
-        "VALUES (?, ?, ?, ?, ?, ?)";
+    sqlite3_stmt* stmtFile = nullptr;
+    sqlite3_stmt* stmtPathSelect = nullptr;
+    sqlite3_stmt* stmtPathInsert = nullptr;
+    int rc;
 
-    sqlite3_stmt* stmt = nullptr;
-    int rc = sqlite3_prepare_v2(DB, sql, -1, &stmt, nullptr);
+    const char* sqlPathSelect = "SELECT id FROM paths WHERE Path = ?";
+    rc = sqlite3_prepare_v2(DB, sqlPathSelect, -1, &stmtPathSelect, nullptr);
     if (rc != SQLITE_OK) {
-        cerr << "Prepare failed: " << sqlite3_errmsg(DB) << endl;
+        cerr << "Prepare failed (Path SELECT): " << sqlite3_errmsg(DB) << endl;
         execSimple("ROLLBACK;");
         return rc;
     }
-
+    const char* sqlPathInsert = "INSERT OR IGNORE INTO paths (path) VALUES (?)";
+    rc = sqlite3_prepare_v2(DB, sqlPathInsert, -1, &stmtPathInsert, nullptr);
+    if (rc != SQLITE_OK) {
+        cerr << "Prepare failed (Path INSERT): " << sqlite3_errmsg(DB) << endl;
+        execSimple("ROLLBACK;");
+        return rc;
+    }
+    const char* sqlFile =
+        "INSERT OR IGNORE INTO files "
+        "(Name, Extension, Path_id, Size, Epoch, Depth) "
+        "VALUES (?, ?, ?, ?, ?, ?)";
+    rc = sqlite3_prepare_v2(DB, sqlFile, -1, &stmtFile, nullptr);
+    if (rc != SQLITE_OK) {
+        cerr << "Prepare failed (File INSERT): " << sqlite3_errmsg(DB) << endl;
+        execSimple("ROLLBACK;");
+        return rc;
+    }
     for (const auto& file : FileList) {
-        sqlite3_bind_text(stmt, 1, file.fName.c_str(), -1, SQLITE_TRANSIENT);
-        sqlite3_bind_text(stmt, 2, file.fExtension.c_str(), -1, SQLITE_TRANSIENT);
-        sqlite3_bind_text(stmt, 3, file.fPath.c_str(), -1, SQLITE_TRANSIENT);
-        sqlite3_bind_int64(stmt, 4, file.fSize);
-        sqlite3_bind_double(stmt, 5, file.fEpoch);
-        sqlite3_bind_int(stmt, 6, file.fDepth);
+        int pathId = 0;
+        
+        sqlite3_bind_text(stmtPathSelect, 1, file.fPath.c_str(), -1, SQLITE_TRANSIENT);
+        rc = sqlite3_step(stmtPathSelect);
+        if (rc == SQLITE_ROW) {
+            pathId = sqlite3_column_int(stmtPathSelect, 0);
+        } else {
+            
+            sqlite3_reset(stmtPathInsert);
+            sqlite3_bind_text(stmtPathInsert, 1, file.fPath.c_str(), -1, SQLITE_TRANSIENT);
+            rc = sqlite3_step(stmtPathInsert);
+            if (rc != SQLITE_DONE && rc != SQLITE_CONSTRAINT) { 
+                cerr << "Insert path failed: " << sqlite3_errmsg(DB) << endl;
+                sqlite3_finalize(stmtFile);
+                sqlite3_finalize(stmtPathSelect);
+                sqlite3_finalize(stmtPathInsert);
+                execSimple("ROLLBACK;");
+                return rc;
+            }
+            
+            pathId = (int)sqlite3_last_insert_rowid(DB);
+        }
+        sqlite3_reset(stmtPathSelect);
+        
+        sqlite3_bind_text(stmtFile, 1, file.fName.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmtFile, 2, file.fExtension.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmtFile, 3, pathId);
+        sqlite3_bind_int64(stmtFile, 4, file.fSize);
+        sqlite3_bind_double(stmtFile, 5, file.fEpoch);
+        sqlite3_bind_int(stmtFile, 6, file.fDepth);
 
-        rc = sqlite3_step(stmt);
+        rc = sqlite3_step(stmtFile);
         if (rc != SQLITE_DONE) {
-            cerr << "Insert failed: " << sqlite3_errmsg(DB) << endl;
-            sqlite3_finalize(stmt);
+            cerr << "Insert file failed: " << sqlite3_errmsg(DB) << endl;
+            sqlite3_finalize(stmtFile);
+            sqlite3_finalize(stmtPathSelect);
+            sqlite3_finalize(stmtPathInsert);
             execSimple("ROLLBACK;");
             return rc;
         }
 
-        sqlite3_reset(stmt);
-        sqlite3_clear_bindings(stmt);
+        sqlite3_reset(stmtFile);
+        sqlite3_clear_bindings(stmtFile);
     }
 
-    sqlite3_finalize(stmt);
+    sqlite3_finalize(stmtFile);
+    sqlite3_finalize(stmtPathSelect);
+    sqlite3_finalize(stmtPathInsert);
 
     if (!execSimple("COMMIT;")) {
         return SQLITE_ERROR;
@@ -71,6 +115,7 @@ int Indexer::insertFilesBatch() {
 
     return SQLITE_OK;
 }
+
 
 int Indexer::storeAndClear() {
     if (!FileList.empty()) {
